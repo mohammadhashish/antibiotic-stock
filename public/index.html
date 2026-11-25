@@ -46,6 +46,8 @@ li .s{font-weight:800;font-size:.9rem;padding:2px 10px;border-radius:99px;backgr
 .top{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .ctl{display:flex;gap:6px;flex-shrink:0}
 .ctl button{min-width:36px;height:32px;padding:0 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);font:inherit;font-size:.8rem;font-weight:700;cursor:pointer}
+.foot{margin:24px 0 0;text-align:center;font-size:.8rem;color:var(--muted)}
+.tools button[disabled]{opacity:.5;cursor:not-allowed}
 .ctl button.on{border-color:var(--accent);color:var(--accent)}
 li .n{direction:ltr;unicode-bidi:plaintext;text-align:left}[dir="rtl"] li .n{text-align:right}
 li .d{direction:inherit}
@@ -64,6 +66,7 @@ li .d{direction:inherit}
 <div class="tools" id="tools" hidden>
   <span id="t-up">ارفعي شيت الإكسيل (أعمدة: اسم الدوا، الرصيد الحالي، المعدل الشهري) وهيتحفظ، وأي حد يفتح اللينك هيشوف آخر شيت.</span><br>
   <label><input type="file" id="f" accept=".xlsx,.xls,.csv"><span id="t-upbtn">رفع الشيت</span></label>
+  <button type="button" id="btn-save" disabled>حفظ</button>
   <span class="msg" id="msg" role="status"></span>
 </div>
 <div class="tools" id="tools2" hidden>
@@ -71,6 +74,7 @@ li .d{direction:inherit}
   <button type="button" id="exp-all">تصدير الرصيد (.xlsx)</button>
   <button type="button" id="exp-order">تصدير طلبية النواقص (.xlsx)</button>
 </div>
+<p class="foot" id="foot">من إعداد مخزن الأدوية</p>
 </main>
 <script type="application/json" id="seed">{"rows":[["Amikin 500mg ",0,200],["Ampicillin + sulbactam 1500mg",5976,3200],["Ampicillin + sulbactam 375mg",125,50],["Linezolid 600mg",100,300],["Aztreonam 1g",0,500],["Ceftriaxone 1g",3068,2000],["Sulperazone 1.5g",1080,300],["Ceftazedime 1g",4140,1700],["Cefotaxime 1g",7200,1700],["Klacid 500mg",50,100],["Clindamycin 600mg",664,1500],["Clindamycin 900mg",1790,1500],["Cefepime 1g",4420,1500],["Colistin",720,1000],["Cipro 200mg",0,200],["Cefazoline 1g",960,1000],["Imipenem",760,700],["Levo 500mg",200,500],["Levo 750mg",0,800],["Metronidazole",0,2000],["Meropenem 1g",4200,6000],["Meropenem 500mg",0,6000],["Piprataz 4.5g",1200,800],["Targocid 200mg",130,200],["Targocid 400mg",0,200],["Tygacil",500,800],["Vanco 1g",320,700],["Vanco 500mg",500,700],["Zavicefta 2.5g",0,100]],"updated":"2026-11-25T13:21:01.518Z"}</script>
 <script>(function(){
@@ -78,13 +82,13 @@ var API="/api/stock",PIN_KEY="abx_admin_pin",PREF_KEY="abx_prefs";
 var seed=JSON.parse(document.getElementById("seed").textContent);
 var data=seed.rows,updated=seed.updated,filter="all";
 var prefs={};try{prefs=JSON.parse(localStorage.getItem(PREF_KEY))||{}}catch(e){}
-var lang=prefs.lang==="en"?"en":"ar",theme=prefs.theme||"auto",pin=null;
+var lang=prefs.lang==="en"?"en":"ar",theme=prefs.theme||"auto",pin=null,pending=null;
 try{pin=localStorage.getItem(PIN_KEY)}catch(e){}
 var sub=document.getElementById("sub"),msg=document.getElementById("msg");
 var L={
  ar:{dir:"rtl",title:"رصيد الأدوية",st:{g:"كافي",y:"أقل من شهر",r:"أقل من أسبوع",x:"غير متوفر"},
   search:"ابحث عن دوا",out:"الرصيد خلص",noRate:"مفيش استهلاك مسجل",days:function(d){return "يكفي حوالي "+d+" يوم"},
-  empty:"مفيش أدوية بالشكل ده.",upd:"آخر تحديث: ",demo:"بيانات تجريبية",
+  empty:"مفيش أدوية بالشكل ده.",sub:"مخزون المضادات الحيوية في مستشفى جمال عبد الناصر",foot:"من إعداد مخزن الأدوية",save:"حفظ",pending:function(n){return "اتقرا الملف ("+n+" صنف). اضغطي حفظ عشان يستبدل الشيت القديم ويظهر للجميع."},upd:"آخر تحديث: ",demo:"بيانات تجريبية",
   up:"ارفعي شيت الإكسيل (أعمدة: اسم الدوا، الرصيد الحالي، المعدل الشهري) وهيتحفظ، وأي حد يفتح اللينك هيشوف آخر شيت.",upBtn:"رفع الشيت",
   exp:"تصدير الرصيد الحالي كملف إكسيل، أو طلبية بالأصناف اللي محتاجة طلب (تغطية 30 يوم).",expAll:"تصدير الرصيد (.xlsx)",expOrder:"تصدير طلبية النواقص (.xlsx)",
   askPin:"اكتبي رمز المسؤول:",badPin:"الرمز غلط.",logout:"تخرجي من وضع المسؤول؟",saving:"جاري الحفظ…",saved:"اتحفظ ✓ أي حد يفتح اللينك هيشوف الشيت ده.",
@@ -93,7 +97,7 @@ var L={
   cols:["اسم الدواء","الرصيد الحالي","المعدل الشهري","أيام التغطية","الحالة","مقترح الطلب (30 يوم)"],ocol:"الكمية المقترحة للطلب (30 يوم)",loc:"ar-EG",other:"EN"},
  en:{dir:"ltr",title:"Medicine Stock",st:{g:"Sufficient",y:"Under a month",r:"Under a week",x:"Out of stock"},
   search:"Search for a drug",out:"Out of stock",noRate:"No usage recorded",days:function(d){return "Lasts about "+d+" days"},
-  empty:"No drugs match.",upd:"Last updated: ",demo:"Sample data",
+  empty:"No drugs match.",sub:"Antibiotic stock at Gamal Abdel Nasser Hospital",foot:"Made by Medical Warehouse",save:"Save",pending:function(n){return "File read ("+n+" items). Press Save to replace the old sheet for everyone."},upd:"Last updated: ",demo:"Sample data",
   up:"Upload the Excel sheet (columns: drug name, current stock, monthly rate). It's saved, and everyone who opens the link sees the latest sheet.",upBtn:"Upload sheet",
   exp:"Export current stock as an Excel file, or an order list of items that need ordering (30-day cover).",expAll:"Export stock (.xlsx)",expOrder:"Export order list (.xlsx)",
   askPin:"Enter the admin code:",badPin:"Wrong code.",logout:"Leave admin mode?",saving:"Saving…",saved:"Saved ✓ Everyone who opens the link sees this sheet.",
@@ -119,7 +123,7 @@ function applyLang(){
   var t=T();document.documentElement.lang=lang;document.documentElement.dir=t.dir;document.title=t.title;
   $("t-title").textContent=t.title;$("q").placeholder=t.search;$("q").setAttribute("aria-label",t.search);
   $("t-up").textContent=t.up;$("t-upbtn").textContent=t.upBtn;$("t-exp").textContent=t.exp;
-  $("exp-all").textContent=t.expAll;$("exp-order").textContent=t.expOrder;$("btn-lang").textContent=t.other;
+  $("exp-all").textContent=t.expAll;$("foot").textContent=t.foot;$("btn-save").textContent=t.save;$("exp-order").textContent=t.expOrder;$("btn-lang").textContent=t.other;
 }
 function render(){
   var t=T(),ST=t.st;
@@ -141,7 +145,7 @@ function render(){
     var d=r.s.k==="x"?t.out:r.s.days===null?t.noRate:t.days(Math.floor(r.s.days));
     return'<li class="'+r.s.k+'"><div class="n">'+esc(r.n)+'<div class="d" dir="'+t.dir+'">'+esc(d)+'</div></div><span class="s">'+ST[r.s.k]+'</span></li>';
   }).join(""):'<li class="empty" style="display:block;border:0">'+esc(t.empty)+'</li>';
-  sub.textContent=stamp();
+  sub.textContent=T().sub;
 }
 function load(){
   fetch(API,{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
@@ -160,16 +164,17 @@ $("btn-admin").onclick=function(){
 };
 function save(rows){
   var t=T();if(!pin)return;
-  msg.textContent=t.saving;
+  msg.textContent=t.saving;$("btn-save").disabled=true;
   fetch(API,{method:"POST",headers:{"Content-Type":"application/json","x-admin-pin":pin},body:JSON.stringify({rows:rows,source:"upload"})})
   .then(function(r){
     if(r.status===401){pin=null;try{localStorage.removeItem(PIN_KEY)}catch(e){}applyAdmin();throw{m:t.badPin}}
     if(!r.ok)throw{m:t.saveFail};
     return r.json();
   }).then(function(d){
-    data=d.current.rows;updated=d.current.updated;render();msg.textContent=t.saved;
-  }).catch(function(e){msg.textContent="";alert(e&&e.m?e.m:t.net)});
+    data=d.current.rows;updated=d.current.updated;pending=null;$("btn-save").disabled=true;render();msg.textContent=t.saved;
+  }).catch(function(e){msg.textContent=pending?t.pending(pending.length):"";$("btn-save").disabled=!pending;alert(e&&e.m?e.m:t.net)});
 }
+$("btn-save").onclick=function(){if(pending)save(pending)};
 $("q").oninput=render;
 $("f").onchange=function(e){
   var file=e.target.files[0];if(!file)return;
@@ -184,7 +189,8 @@ $("f").onchange=function(e){
       });
       if(!out.length)throw 0;
     }catch(err){alert(T().bad);return}
-    save(out);
+    pending=out;data=out;render();
+    msg.textContent=T().pending(out.length);$("btn-save").disabled=false;
   };
   rd.readAsArrayBuffer(file);
   e.target.value="";
@@ -209,7 +215,7 @@ $("exp-order").onclick=function(){
   if(aoa.length<2){alert(t.noOrder);return}
   download(aoa,"Order","antibiotic-order-"+today()+".xlsx");
 };
-$("btn-lang").onclick=function(){lang=lang==="ar"?"en":"ar";savePrefs();applyLang();render();msg.textContent=""};
+$("btn-lang").onclick=function(){lang=lang==="ar"?"en":"ar";savePrefs();applyLang();render();msg.textContent=pending?T().pending(pending.length):""};
 $("btn-theme").onclick=function(){theme=isDark()?"light":"dark";savePrefs();applyTheme()};
 applyTheme();applyLang();applyAdmin();render();load();
 if(pin)checkPin(pin).then(function(ok){if(!ok){pin=null;try{localStorage.removeItem(PIN_KEY)}catch(e){}applyAdmin()}}).catch(function(){});

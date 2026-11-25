@@ -43,35 +43,67 @@ li .s{font-weight:800;font-size:.9rem;padding:2px 10px;border-radius:99px;backgr
 .tools input:focus-visible+span{outline:3px solid var(--text);outline-offset:3px}
 .empty{padding:24px;text-align:center;color:var(--muted)}
 .tools[hidden]{display:none}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ctl{display:flex;gap:6px;flex-shrink:0}
+.ctl button{min-width:36px;height:32px;padding:0 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);font:inherit;font-size:.8rem;font-weight:700;cursor:pointer}
+.ctl button.on{border-color:var(--accent);color:var(--accent)}
+li .n{direction:ltr;unicode-bidi:plaintext;text-align:left}[dir="rtl"] li .n{text-align:right}
+li .d{direction:inherit}
 .tools .msg{display:block;margin-top:8px;font-weight:600}
 .tools button{display:inline-block;margin-top:6px;padding:8px 14px;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:10px;font:inherit;font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
 <main>
-<h1>رصيد الأدوية</h1>
+<div class="top"><h1 id="t-title">رصيد الأدوية</h1>
+<div class="ctl"><button type="button" id="btn-lang">EN</button><button type="button" id="btn-theme" aria-label="theme">☾</button><button type="button" id="btn-admin" aria-label="admin">🔒</button></div></div>
 <p class="sub" id="sub" role="status"></p>
 <div class="counts" id="counts"></div>
 <input type="search" id="q" placeholder="ابحث عن دوا" aria-label="بحث عن دوا">
 <ul id="list"></ul>
-<div class="tools" id="tools">
-  ارفعي شيت الإكسيل (أعمدة: اسم الدوا، الرصيد الحالي، المعدل الشهري) وهيتحفظ، وأي حد يفتح اللينك هيشوف آخر شيت.<br>
-  <label><input type="file" id="f" accept=".xlsx,.xls,.csv"><span>رفع الشيت</span></label>
+<div class="tools" id="tools" hidden>
+  <span id="t-up">ارفعي شيت الإكسيل (أعمدة: اسم الدوا، الرصيد الحالي، المعدل الشهري) وهيتحفظ، وأي حد يفتح اللينك هيشوف آخر شيت.</span><br>
+  <label><input type="file" id="f" accept=".xlsx,.xls,.csv"><span id="t-upbtn">رفع الشيت</span></label>
   <span class="msg" id="msg" role="status"></span>
 </div>
-<div class="tools">
-  تصدير الرصيد الحالي كملف إكسيل، أو طلبية بالأصناف اللي محتاجة طلب (تغطية 30 يوم).<br>
+<div class="tools" id="tools2" hidden>
+  <span id="t-exp">تصدير الرصيد الحالي كملف إكسيل، أو طلبية بالأصناف اللي محتاجة طلب (تغطية 30 يوم).</span><br>
   <button type="button" id="exp-all">تصدير الرصيد (.xlsx)</button>
   <button type="button" id="exp-order">تصدير طلبية النواقص (.xlsx)</button>
 </div>
 </main>
 <script type="application/json" id="seed">{"rows":[["Amikin 500mg ",0,200],["Ampicillin + sulbactam 1500mg",5976,3200],["Ampicillin + sulbactam 375mg",125,50],["Linezolid 600mg",100,300],["Aztreonam 1g",0,500],["Ceftriaxone 1g",3068,2000],["Sulperazone 1.5g",1080,300],["Ceftazedime 1g",4140,1700],["Cefotaxime 1g",7200,1700],["Klacid 500mg",50,100],["Clindamycin 600mg",664,1500],["Clindamycin 900mg",1790,1500],["Cefepime 1g",4420,1500],["Colistin",720,1000],["Cipro 200mg",0,200],["Cefazoline 1g",960,1000],["Imipenem",760,700],["Levo 500mg",200,500],["Levo 750mg",0,800],["Metronidazole",0,2000],["Meropenem 1g",4200,6000],["Meropenem 500mg",0,6000],["Piprataz 4.5g",1200,800],["Targocid 200mg",130,200],["Targocid 400mg",0,200],["Tygacil",500,800],["Vanco 1g",320,700],["Vanco 500mg",500,700],["Zavicefta 2.5g",0,100]],"updated":"2026-11-25T13:21:01.518Z"}</script>
 <script>(function(){
-var API="/api/stock",PIN_KEY="abx_admin_pin";
+var API="/api/stock",PIN_KEY="abx_admin_pin",PREF_KEY="abx_prefs";
 var seed=JSON.parse(document.getElementById("seed").textContent);
 var data=seed.rows,updated=seed.updated,filter="all";
+var prefs={};try{prefs=JSON.parse(localStorage.getItem(PREF_KEY))||{}}catch(e){}
+var lang=prefs.lang==="en"?"en":"ar",theme=prefs.theme||"auto",pin=null;
+try{pin=localStorage.getItem(PIN_KEY)}catch(e){}
 var sub=document.getElementById("sub"),msg=document.getElementById("msg");
-var ST={g:"كافي",y:"أقل من شهر",r:"أقل من أسبوع",x:"غير متوفر"};
+var L={
+ ar:{dir:"rtl",title:"رصيد الأدوية",st:{g:"كافي",y:"أقل من شهر",r:"أقل من أسبوع",x:"غير متوفر"},
+  search:"ابحث عن دوا",out:"الرصيد خلص",noRate:"مفيش استهلاك مسجل",days:function(d){return "يكفي حوالي "+d+" يوم"},
+  empty:"مفيش أدوية بالشكل ده.",upd:"آخر تحديث: ",demo:"بيانات تجريبية",
+  up:"ارفعي شيت الإكسيل (أعمدة: اسم الدوا، الرصيد الحالي، المعدل الشهري) وهيتحفظ، وأي حد يفتح اللينك هيشوف آخر شيت.",upBtn:"رفع الشيت",
+  exp:"تصدير الرصيد الحالي كملف إكسيل، أو طلبية بالأصناف اللي محتاجة طلب (تغطية 30 يوم).",expAll:"تصدير الرصيد (.xlsx)",expOrder:"تصدير طلبية النواقص (.xlsx)",
+  askPin:"اكتبي رمز المسؤول:",badPin:"الرمز غلط.",logout:"تخرجي من وضع المسؤول؟",saving:"جاري الحفظ…",saved:"اتحفظ ✓ أي حد يفتح اللينك هيشوف الشيت ده.",
+  saveFail:"الشيت ماتحفظش (فيه مشكلة مؤقتة). جربي تاني.",net:"فيه مشكلة في الاتصال. جربي تاني.",
+  bad:"مقدرتش أقرا الشيت. اتأكدي إن العمود الأول اسم الدوا، التاني الرصيد، والتالت المعدل الشهري.",noOrder:"كل الأصناف مغطية 30 يوم.",
+  cols:["اسم الدواء","الرصيد الحالي","المعدل الشهري","أيام التغطية","الحالة","مقترح الطلب (30 يوم)"],ocol:"الكمية المقترحة للطلب (30 يوم)",loc:"ar-EG",other:"EN"},
+ en:{dir:"ltr",title:"Medicine Stock",st:{g:"Sufficient",y:"Under a month",r:"Under a week",x:"Out of stock"},
+  search:"Search for a drug",out:"Out of stock",noRate:"No usage recorded",days:function(d){return "Lasts about "+d+" days"},
+  empty:"No drugs match.",upd:"Last updated: ",demo:"Sample data",
+  up:"Upload the Excel sheet (columns: drug name, current stock, monthly rate). It's saved, and everyone who opens the link sees the latest sheet.",upBtn:"Upload sheet",
+  exp:"Export current stock as an Excel file, or an order list of items that need ordering (30-day cover).",expAll:"Export stock (.xlsx)",expOrder:"Export order list (.xlsx)",
+  askPin:"Enter the admin code:",badPin:"Wrong code.",logout:"Leave admin mode?",saving:"Saving…",saved:"Saved ✓ Everyone who opens the link sees this sheet.",
+  saveFail:"The sheet wasn't saved (temporary problem). Try again.",net:"Connection problem. Try again.",
+  bad:"Couldn't read the sheet. Make sure column 1 is the drug name, column 2 the stock and column 3 the monthly rate.",noOrder:"All items cover 30 days.",
+  cols:["Drug name","Current stock","Monthly rate","Days of cover","Status","Suggested order (30 days)"],ocol:"Suggested order qty (30 days)",loc:"en-GB",other:"عربي"}
+};
+function T(){return L[lang]}
+function $(id){return document.getElementById(id)}
+function savePrefs(){try{localStorage.setItem(PREF_KEY,JSON.stringify({lang:lang,theme:theme}))}catch(e){}}
 function status(bal,rate){
   if(!(bal>0))return{k:"x",days:0};
   if(!(rate>0))return{k:"g",days:null};
@@ -79,26 +111,36 @@ function status(bal,rate){
   return{k:d<7?"r":d<30?"y":"g",days:d};
 }
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
-function stamp(){return updated?"آخر تحديث: "+new Date(updated).toLocaleString("ar-EG",{dateStyle:"medium",timeStyle:"short"}):"بيانات تجريبية"}
+function stamp(){return updated?T().upd+new Date(updated).toLocaleString(T().loc,{dateStyle:"medium",timeStyle:"short"}):T().demo}
+function isDark(){return theme==="dark"||(theme==="auto"&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)}
+function applyTheme(){var r=document.documentElement;if(theme==="auto")r.removeAttribute("data-theme");else r.setAttribute("data-theme",theme);$("btn-theme").textContent=isDark()?"☀":"☾"}
+function applyAdmin(){var on=!!pin;$("tools").hidden=!on;$("tools2").hidden=!on;$("btn-admin").textContent=on?"🔓":"🔒";$("btn-admin").classList.toggle("on",on)}
+function applyLang(){
+  var t=T();document.documentElement.lang=lang;document.documentElement.dir=t.dir;document.title=t.title;
+  $("t-title").textContent=t.title;$("q").placeholder=t.search;$("q").setAttribute("aria-label",t.search);
+  $("t-up").textContent=t.up;$("t-upbtn").textContent=t.upBtn;$("t-exp").textContent=t.exp;
+  $("exp-all").textContent=t.expAll;$("exp-order").textContent=t.expOrder;$("btn-lang").textContent=t.other;
+}
 function render(){
-  var rows=data.map(function(r){return{n:r[0],b:r[1],s:status(r[1],r[2])}});
+  var t=T(),ST=t.st;
+  var rows=data.map(function(r){return{n:String(r[0]).trim(),b:r[1],s:status(r[1],r[2])}});
   var order={g:0,y:1,r:2,x:3};
-  rows.sort(function(a,b){return order[a.s.k]-order[b.s.k]||String(a.n).localeCompare(String(b.n),"ar")});
+  rows.sort(function(a,b){return order[a.s.k]-order[b.s.k]||a.n.localeCompare(b.n,"ar")});
   var cnt={g:0,y:0,r:0,x:0};rows.forEach(function(r){cnt[r.s.k]++});
   var html="";
   ["g","y","r","x"].forEach(function(k){
     html+='<button class="c-'+k+'" data-k="'+k+'" aria-pressed="'+(filter===k)+'"><b>'+cnt[k]+'</b><span>'+ST[k]+'</span></button>';
   });
-  document.getElementById("counts").innerHTML=html;
+  $("counts").innerHTML=html;
   document.querySelectorAll("#counts [data-k]").forEach(function(b){
     b.onclick=function(){filter=filter===b.dataset.k?"all":b.dataset.k;render()};
   });
-  var q=document.getElementById("q").value.trim();
-  var shown=rows.filter(function(r){return(filter==="all"||r.s.k===filter)&&(!q||String(r.n).toLowerCase().indexOf(q.toLowerCase())>-1)});
-  document.getElementById("list").innerHTML=shown.length?shown.map(function(r){
-    var d=r.s.k==="x"?"الرصيد خلص":r.s.days===null?"مفيش استهلاك مسجل":"يكفي حوالي "+Math.floor(r.s.days)+" يوم";
-    return'<li class="'+r.s.k+'"><div class="n">'+esc(r.n)+'<div class="d">'+d+'</div></div><span class="s">'+ST[r.s.k]+'</span></li>';
-  }).join(""):'<li class="empty" style="display:block;border:0">مفيش أدوية بالشكل ده.</li>';
+  var q=$("q").value.trim().toLowerCase();
+  var shown=rows.filter(function(r){return(filter==="all"||r.s.k===filter)&&(!q||r.n.toLowerCase().indexOf(q)>-1)});
+  $("list").innerHTML=shown.length?shown.map(function(r){
+    var d=r.s.k==="x"?t.out:r.s.days===null?t.noRate:t.days(Math.floor(r.s.days));
+    return'<li class="'+r.s.k+'"><div class="n">'+esc(r.n)+'<div class="d" dir="'+t.dir+'">'+esc(d)+'</div></div><span class="s">'+ST[r.s.k]+'</span></li>';
+  }).join(""):'<li class="empty" style="display:block;border:0">'+esc(t.empty)+'</li>';
   sub.textContent=stamp();
 }
 function load(){
@@ -106,27 +148,30 @@ function load(){
     if(d&&d.current&&d.current.rows){data=d.current.rows;updated=d.current.updated;render()}
   }).catch(function(){});
 }
-function getPin(){
-  var p=null;try{p=sessionStorage.getItem(PIN_KEY)}catch(e){}
-  if(!p){p=prompt("اكتبي رمز التحديث:");if(p)p=p.trim()}
-  return p||null;
-}
+function checkPin(p){return fetch(API,{method:"POST",headers:{"Content-Type":"application/json","x-admin-pin":p},body:'{"checkOnly":true}'}).then(function(r){return r.ok})}
+$("btn-admin").onclick=function(){
+  var t=T();
+  if(pin){if(confirm(t.logout)){pin=null;try{localStorage.removeItem(PIN_KEY)}catch(e){}msg.textContent="";applyAdmin()}return}
+  var p=prompt(t.askPin);if(!p)return;p=p.trim();
+  checkPin(p).then(function(ok){
+    if(!ok){alert(t.badPin);return}
+    pin=p;try{localStorage.setItem(PIN_KEY,p)}catch(e){}applyAdmin();
+  }).catch(function(){alert(t.net)});
+};
 function save(rows){
-  var pin=getPin();if(!pin)return;
-  msg.textContent="جاري الحفظ…";
+  var t=T();if(!pin)return;
+  msg.textContent=t.saving;
   fetch(API,{method:"POST",headers:{"Content-Type":"application/json","x-admin-pin":pin},body:JSON.stringify({rows:rows,source:"upload"})})
   .then(function(r){
-    if(r.status===401){try{sessionStorage.removeItem(PIN_KEY)}catch(e){}throw{m:"الرمز غلط. جربي تاني."}}
-    if(!r.ok)throw{m:"الشيت ماتحفظش (فيه مشكلة مؤقتة). جربي تاني."};
+    if(r.status===401){pin=null;try{localStorage.removeItem(PIN_KEY)}catch(e){}applyAdmin();throw{m:t.badPin}}
+    if(!r.ok)throw{m:t.saveFail};
     return r.json();
   }).then(function(d){
-    try{sessionStorage.setItem(PIN_KEY,pin)}catch(e){}
-    data=d.current.rows;updated=d.current.updated;render();
-    msg.textContent="اتحفظ ✓ أي حد يفتح اللينك هيشوف الشيت ده.";
-  }).catch(function(e){msg.textContent="";alert(e&&e.m?e.m:"الشيت ماتحفظش (فيه مشكلة في الاتصال). جربي تاني.")});
+    data=d.current.rows;updated=d.current.updated;render();msg.textContent=t.saved;
+  }).catch(function(e){msg.textContent="";alert(e&&e.m?e.m:t.net)});
 }
-document.getElementById("q").oninput=render;
-document.getElementById("f").onchange=function(e){
+$("q").oninput=render;
+$("f").onchange=function(e){
   var file=e.target.files[0];if(!file)return;
   var rd=new FileReader();
   rd.onload=function(){
@@ -138,7 +183,7 @@ document.getElementById("f").onchange=function(e){
         if(r[0]!==undefined&&r[0]!==null&&String(r[0]).trim()!=="")out.push([String(r[0]).trim(),Number(r[1])||0,Number(r[2])||0]);
       });
       if(!out.length)throw 0;
-    }catch(err){alert("مقدرتش أقرا الشيت. اتأكدي إن العمود الأول اسم الدوا، التاني الرصيد، والتالت المعدل الشهري.");return}
+    }catch(err){alert(T().bad);return}
     save(out);
   };
   rd.readAsArrayBuffer(file);
@@ -146,25 +191,27 @@ document.getElementById("f").onchange=function(e){
 };
 function orderQty(bal,rate){if(!(rate>0))return 0;var n=Math.ceil(rate-bal-1e-9);return n>0?n:0}
 function download(aoa,name,file){
-  if(typeof XLSX==="undefined"){alert("فيه مشكلة في الاتصال. جربي تاني.");return}
+  if(typeof XLSX==="undefined"){alert(T().net);return}
   var ws=XLSX.utils.aoa_to_sheet(aoa);ws["!cols"]=aoa[0].map(function(_,i){return{wch:i===0?32:16}});
   var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,name);XLSX.writeFile(wb,file);
 }
 function today(){return new Date().toISOString().slice(0,10)}
-document.getElementById("exp-all").onclick=function(){
-  var aoa=[["اسم الدواء","الرصيد الحالي","المعدل الشهري","أيام التغطية","الحالة","مقترح الطلب (30 يوم)"]];
+$("exp-all").onclick=function(){
+  var t=T(),aoa=[t.cols.slice()];
   data.forEach(function(r){var b=Number(r[1])||0,m=Number(r[2])||0,s=status(b,m);
-    aoa.push([String(r[0]).trim(),b,m,s.days===null?"":Math.floor(s.days),ST[s.k],orderQty(b,m)])});
+    aoa.push([String(r[0]).trim(),b,m,s.days===null?"":Math.floor(s.days),t.st[s.k],orderQty(b,m)])});
   download(aoa,"Stock","antibiotic-stock-"+today()+".xlsx");
 };
-document.getElementById("exp-order").onclick=function(){
-  var aoa=[["اسم الدواء","الرصيد الحالي","المعدل الشهري","أيام التغطية","الكمية المقترحة للطلب (30 يوم)"]];
+$("exp-order").onclick=function(){
+  var t=T(),aoa=[[t.cols[0],t.cols[1],t.cols[2],t.cols[3],t.ocol]];
   data.forEach(function(r){var b=Number(r[1])||0,m=Number(r[2])||0,q=orderQty(b,m),s=status(b,m);
     if(q>0)aoa.push([String(r[0]).trim(),b,m,s.days===null?"":Math.floor(s.days),q])});
-  if(aoa.length<2){alert("كل الأصناف مغطية 30 يوم.");return}
+  if(aoa.length<2){alert(t.noOrder);return}
   download(aoa,"Order","antibiotic-order-"+today()+".xlsx");
 };
-render();
-load();
+$("btn-lang").onclick=function(){lang=lang==="ar"?"en":"ar";savePrefs();applyLang();render();msg.textContent=""};
+$("btn-theme").onclick=function(){theme=isDark()?"light":"dark";savePrefs();applyTheme()};
+applyTheme();applyLang();applyAdmin();render();load();
+if(pin)checkPin(pin).then(function(ok){if(!ok){pin=null;try{localStorage.removeItem(PIN_KEY)}catch(e){}applyAdmin()}}).catch(function(){});
 })();</script>
 </body></html>

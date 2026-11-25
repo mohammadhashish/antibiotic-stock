@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f6b5c">
+<title>رصيد الأدوية — متابعة مخزون المضادات الحيوية</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<style>
+:root{
+  --bg:#f3f6f5;--surface:#fff;--surface-2:#f8faf9;--text:#16302b;--muted:#5d7570;--line:#d9e3e0;
+  --g:#1f9d63;--gbg:#e3f5ec;--y:#b7860b;--ybg:#fbf1d3;--r:#d23a3a;--rbg:#fde5e5;--x:#6b7775;--xbg:#e8ecec;
+  --accent:#0f6b5c;--accent-h:#0b5649;--accent-soft:#e4f2ef;
+  --shadow:0 1px 3px rgba(15,40,35,.06),0 4px 12px rgba(15,40,35,.04);--radius:14px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;
+  --bg:#0f1a18;--surface:#17262a;--surface-2:#1d2f34;--text:#e6f1ee;--muted:#93aaa5;--line:#2a3f3b;
+  --g:#4cd08e;--gbg:#173a2b;--y:#f0c24a;--ybg:#3b3213;--r:#ff7a7a;--rbg:#41191b;--x:#a3b0ae;--xbg:#26302f;
+  --accent:#58c7b3;--accent-h:#74d6c4;--accent-soft:#193532;--shadow:0 2px 8px rgba(0,0,0,.28)}}
+:root[data-theme="dark"]{color-scheme:dark;
+  --bg:#0f1a18;--surface:#17262a;--surface-2:#1d2f34;--text:#e6f1ee;--muted:#93aaa5;--line:#2a3f3b;
+  --g:#4cd08e;--gbg:#173a2b;--y:#f0c24a;--ybg:#3b3213;--r:#ff7a7a;--rbg:#41191b;--x:#a3b0ae;--xbg:#26302f;
+  --accent:#58c7b3;--accent-h:#74d6c4;--accent-soft:#193532;--shadow:0 2px 8px rgba(0,0,0,.28)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Cairo",system-ui,-apple-system,Tahoma,Arial,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+main{max-width:860px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top,0px)) 16px calc(56px + env(safe-area-inset-bottom,0px))}
+button{font:inherit}
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.brand h1{font-size:1.5rem;font-weight:800;margin:0;display:flex;align-items:center;gap:8px}
+.brand-dot{width:11px;height:11px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.sub{color:var(--muted);margin:3px 0 0;font-size:.85rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:.75rem}
+.pill.warn{background:var(--ybg);color:var(--y)}
+.top-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 11px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--text);font-size:.82rem;font-weight:700;cursor:pointer;transition:background .15s,border-color .15s,transform .1s;text-decoration:none}
+.btn:hover{border-color:var(--accent);background:var(--surface-2)}
+.btn:active{transform:scale(.98)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.btn.primary:hover{background:var(--accent-h)}
+.btn.danger{background:var(--rbg);color:var(--r);border-color:transparent}
+.btn svg{width:16px;height:16px;flex-shrink:0}
+.admin-on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.health-wrap{margin-bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow)}
+.health-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);margin-bottom:8px}
+.health-top b{color:var(--text)}
+.health-bar{height:9px;border-radius:99px;background:var(--xbg);overflow:hidden;display:flex;gap:2px}
+.seg-g{background:var(--g)}.seg-y{background:var(--y)}.seg-r{background:var(--r)}.seg-x{background:var(--x)}
+.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.counts button{border:2px solid transparent;border-radius:var(--radius);padding:11px 6px;cursor:pointer;text-align:center;color:inherit;transition:transform .12s}
+.counts button:hover{transform:translateY(-1px)}
+.counts b{display:block;font-size:1.55rem;line-height:1.15;font-weight:800}
+.counts span{font-size:.8rem;font-weight:700;display:block;margin-top:2px}
+.counts button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--text)}
+.c-g{background:var(--gbg);color:var(--g)}.c-y{background:var(--ybg);color:var(--y)}.c-r{background:var(--rbg);color:var(--r)}.c-x{background:var(--xbg);color:var(--x)}
+.toolbar{display:grid;gap:8px;margin-bottom:12px}
+.search-row{display:flex;gap:8px;flex-wrap:wrap}
+.search-box{position:relative;flex:1;min-width:210px}
+.search-box svg{position:absolute;inset-inline-start:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--muted);pointer-events:none}
+.search-box input{width:100%;padding:10px 38px 10px 36px;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--text);font:inherit;font-size:.94rem}
+.search-clear{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);cursor:pointer;padding:4px 6px;font-weight:800;display:none}
+.search-clear.show{display:inline-block}
+.select-wrap{display:flex;gap:8px;flex-wrap:wrap}
+select{padding:9px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--text);font:inherit;font-size:.86rem;font-weight:600;cursor:pointer}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:5px 11px;border-radius:99px;font-size:.8rem;font-weight:700;cursor:pointer}
+.chip:hover{border-color:var(--accent);color:var(--text)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.results-meta{display:flex;justify-content:space-between;align-items:center;font-size:.82rem;color:var(--muted);margin-bottom:8px;flex-wrap:wrap;gap:6px}
+.results-meta strong{color:var(--text)}
+ul.drug-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+li.drug-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;border-inline-start:8px solid var(--c);box-shadow:var(--shadow)}
+.drug-main{min-width:0}
+.drug-name{font-weight:800;font-size:1rem;word-break:break-word;direction:ltr;unicode-bidi:plaintext;text-align:left}
+[dir="rtl"] .drug-name{text-align:right}
+.drug-days{font-size:.84rem;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:4px 12px;flex-wrap:wrap}
+.num{color:var(--text);font-weight:700}
+.delta{font-size:.76rem;font-weight:700;padding:0 7px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line)}
+.delta.down{color:var(--r)}.delta.up{color:var(--g)}
+.cov-track{margin-top:7px;height:6px;width:100%;max-width:260px;background:var(--xbg);border-radius:99px;overflow:hidden}
+.cov-fill{height:100%;background:var(--c);border-radius:99px}
+.drug-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.status-pill{font-weight:800;font-size:.82rem;padding:3px 11px;border-radius:99px;background:var(--cb);color:var(--c);white-space:nowrap}
+.reorder-pill{font-size:.76rem;font-weight:700;padding:2px 9px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);white-space:nowrap}
+.mini-btn{border:1px solid var(--line);background:var(--surface-2);color:var(--muted);border-radius:8px;padding:3px 8px;font-size:.76rem;font-weight:700;cursor:pointer}
+.mini-btn:hover{border-color:var(--accent);color:var(--text)}
+.g{--c:var(--g);--cb:var(--gbg)}.y{--c:var(--y);--cb:var(--ybg)}.r{--c:var(--r);--cb:var(--rbg)}.x{--c:var(--x);--cb:var(--xbg)}
+.empty{padding:32px 16px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius)}
+.panel{margin-top:18px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.panel h2{margin:0 0 6px;font-size:1.05rem;font-weight:800;display:flex;align-items:center;gap:8px}
+.panel p{margin:0 0 12px;font-size:.86rem;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.dropzone{border:2px dashed var(--line);border-radius:12px;padding:18px 14px;text-align:center;background:var(--surface-2);cursor:pointer}
+.dropzone.drag{border-color:var(--accent);background:var(--accent-soft)}
+.dropzone-title{font-weight:700;font-size:.94rem;margin-bottom:4px}
+.dropzone-sub{font-size:.8rem;color:var(--muted);margin-bottom:10px}
+.dropzone input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.sep{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.hist{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:.84rem}
+.hist li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.modal-backdrop{position:fixed;inset:0;background:rgba(10,20,18,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal-backdrop.open{display:flex}
+.modal{width:100%;max-width:480px;max-height:88vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 18px 48px rgba(0,0,0,.28)}
+.modal h3{margin:0 0 12px;font-size:1.1rem;font-weight:800}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:.82rem;font-weight:700;color:var(--muted);margin-bottom:4px}
+.field input,.field textarea{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--text);font:inherit;font-size:.92rem}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap}
+.diff{font-size:.86rem;display:grid;gap:8px}
+.diff-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+.diff-stats div{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:6px}
+.diff-stats b{display:block;font-size:1.2rem}
+.diff ul{margin:0;padding-inline-start:18px;color:var(--muted)}
+.diff .warn{background:var(--ybg);color:var(--y);padding:6px 10px;border-radius:10px;font-weight:700}
+.err{color:var(--r);font-size:.84rem;font-weight:700;min-height:1.2em;margin-top:4px}
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:.86rem;font-weight:700;opacity:0;pointer-events:none;transition:all .25s;z-index:60;max-width:92vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.hidden{display:none!important}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media (max-width:560px){
+  .counts{grid-template-columns:repeat(2,1fr)}
+  li.drug-card{grid-template-columns:1fr}
+  .drug-side{flex-direction:row;align-items:center;justify-content:space-between;width:100%;border-top:1px dashed var(--line);padding-top:8px;flex-wrap:wrap}
+}
+@media print{
+  .top-actions,.toolbar,.panel,.counts,.mini-btn,.toast{display:none!important}
+  body{background:#fff}li.drug-card{box-shadow:none;break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="topbar">
+    <div class="brand">
+      <h1><span class="brand-dot" aria-hidden="true"></span><span data-t="title">رصيد الأدوية</span></h1>
+      <p class="sub" id="sub" role="status"></p>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="btn" id="btn-refresh" data-t-title="refresh" title="تحديث">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16M3 12a9 9 0 0 1 15.5-6.3L21 8"/></svg>
+      </button>
+      <button type="button" class="btn" id="btn-admin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <span id="admin-label"></span>
+      </button>
+      <button type="button" class="btn" id="btn-lang">EN</button>
+      <button type="button" class="btn" id="btn-theme" aria-label="theme">☾</button>
+    </div>
+  </header>
+
+  <section class="health-wrap">
+    <div class="health-top"><span id="health-summary"></span><span id="reorder-summary"></span></div>
+    <div class="health-bar" id="health-bar"></div>
+  </section>
+
+  <div class="counts" id="counts" role="group"></div>
+
+  <section class="toolbar">
+    <div class="search-row">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" id="q" autocomplete="off">
+        <button type="button" class="search-clear" id="q-clear" aria-label="clear">✕</button>
+      </div>
+      <div class="select-wrap">
+        <select id="sort-by"></select>
+        <select id="target-days"></select>
+      </div>
+    </div>
+    <div class="chips" id="quick-chips"></div>
+  </section>
+
+  <div class="results-meta"><span id="results-count"></span><span id="active-filter-note"></span></div>
+  <ul class="drug-list" id="list"></ul>
+
+  <!-- Reorder & exports: everyone -->
+  <section class="panel">
+    <h2 data-t="ordHead"></h2>
+    <p data-t="ordDesc"></p>
+    <div class="row">
+      <button type="button" class="btn primary" id="btn-copy-order"></button>
+      <button type="button" class="btn" id="btn-export-order"></button>
+      <button type="button" class="btn" id="btn-export-all"></button>
+      <button type="button" class="btn" id="btn-print"></button>
+    </div>
+  </section>
+
+  <!-- Admin only -->
+  <section class="panel hidden" id="admin-panel">
+    <h2>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span data-t="upHead"></span>
+    </h2>
+    <p data-t="upDesc"></p>
+    <div class="dropzone" id="dropzone" tabindex="0" role="button">
+      <div class="dropzone-title" data-t="dropTitle"></div>
+      <div class="dropzone-sub" data-t="dropSub"></div>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv">
+      <span class="btn primary" data-t="chooseBtn"></span>
+    </div>
+    <div class="row sep">
+      <button type="button" class="btn" id="btn-add"></button>
+      <button type="button" class="btn" id="btn-template"></button>
+    </div>
+    <div class="sep">
+      <h2 style="font-size:.95rem" data-t="histHead"></h2>
+      <ul class="hist" id="hist"></ul>
+    </div>
+  </section>
+</main>
+
+<!-- PIN modal -->
+<div class="modal-backdrop" id="pin-modal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3 data-t="pinHead"></h3>
+    <p style="font-size:.84rem;color:var(--muted);margin:0 0 10px" data-t="pinDesc"></p>
+    <div class="field"><input type="password" id="pin-input" dir="ltr" autocomplete="current-password" style="letter-spacing:.2em;text-transform:uppercase"></div>
+    <div class="err" id="pin-err"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn" data-close="pin-modal" data-t="cancel"></button>
+      <button type="button" class="btn primary" id="pin-ok" data-t="enter"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-backdrop" id="edit-modal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3 id="edit-title"></h3>
+    <div class="field"><label for="m-name" data-t="lName"></label><input type="text" id="m-name" dir="ltr"></div>
+    <div class="field"><label for="m-bal" data-t="lBal"></label><input type="number" id="m-bal" min="0" step="1" inputmode="numeric"></div>
+    <div class="field"><label for="m-rate" data-t="lRate"></label><input type="number" id="m-rate" min="0" step="1" inputmode="numeric"></div>
+    <div class="err" id="edit-err"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn danger" id="m-delete" style="margin-inline-end:auto" data-t="mDelete"></button>
+      <button type="button" class="btn" data-close="edit-modal" data-t="cancel"></button>
+      <button type="button" class="btn primary" id="m-save" data-t="save"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload preview modal -->
+<div class="modal-backdrop" id="preview-modal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3 data-t="prevHead"></h3>
+    <div class="diff" id="diff"></div>
+    <div class="field" style="margin-top:10px"><label for="up-note" data-t="noteLabel"></label><input type="text" id="up-note"></div>
+    <div class="err" id="prev-err"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn" data-close="preview-modal" data-t="cancel"></button>
+      <button type="button" class="btn primary" id="prev-ok" data-t="publish"></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+var API = "/api/stock";
+var CACHE_KEY = "abx_stock_cache_v3", PREF_KEY = "abx_stock_prefs_v3", PIN_KEY = "abx_admin_pin";
+
+var I18N = {
+ ar:{dir:"rtl",title:"رصيد الأدوية",refresh:"تحديث البيانات",
+  st:{g:"كافي",y:"أقل من شهر",r:"أقل من أسبوع",x:"غير متوفر"},
+  sortOpts:[["urgent","الأكثر إلحاحاً أولاً"],["safe","الأكثر كفاية أولاً"],["alpha","أبجدياً (A–Z)"],["rate","أعلى استهلاك شهري"],["bal","أعلى رصيد حالي"],["delta","أكبر تغيير منذ آخر شيت"]],
+  targetLbl:function(d){return "هدف الطلب: "+d+" يوم";},
+  chips:{all:"الكل","need-order":"يحتاج طلب","under-15":"حرج (أقل من 15 يوم)","in-stock":"المتوفر فقط",changed:"اتغير من آخر شيت"},
+  search:"ابحث عن دوا (مثال: Vanco أو Mero)...",
+  outOfStock:"الرصيد خلص",noRate:"مفيش استهلاك مسجل",
+  daysLeft:function(d){return "يكفي حوالي "+d+" يوم";},
+  runsOut:function(s){return "ينفد تقريباً "+s;},
+  bal:"الرصيد:",rate:"الشهري:",
+  reorder:function(q){return "مقترح الطلب: +"+fmt(q);},
+  delta:function(v){return (v>0?"▲ +":"▼ ")+fmt(v)+" من آخر شيت";},
+  isNew:"صنف جديد",edit:"تعديل",empty:"مفيش أدوية مطابقة للفلتر أو البحث.",
+  updated:"آخر تحديث:",offline:"نسخة محفوظة (غير متصل)",demo:"بيانات الشيت الأصلي",
+  showing:function(n,t){return "عرض "+n+" من "+t+" صنف";},
+  health:function(t,a){return "الإجمالي: <b>"+t+"</b> صنف • متوفر: <b>"+a+"</b>";},
+  reorderSum:function(c,u){return "يحتاج طلب: <b>"+c+"</b> صنف ("+fmt(u)+" وحدة)";},
+  admin:"دخول المسؤول",adminOn:"وضع المسؤول ✓",
+  ordHead:"طلبية النواقص والتصدير",ordDesc:"الكمية المقترحة = الاستهلاك المتوقع لفترة الهدف ناقص الرصيد الحالي.",
+  copyOrder:"نسخ الطلبية (واتساب)",expOrder:"تصدير الطلبية (.xlsx)",expAll:"تصدير الرصيد كامل (.xlsx)",print:"طباعة",
+  upHead:"رفع شيت جديد لتحديث الرصيد للجميع",
+  upDesc:"الأعمدة: اسم الدواء، الرصيد الحالي، المعدل الشهري. هتشوف ملخص التغييرات قبل النشر، وبعد النشر كل اللي فاتح اللينك هيشوف الرصيد الجديد.",
+  dropTitle:"اسحب ملف Excel هنا أو اضغط للاختيار",dropSub:".xlsx / .xls / .csv",chooseBtn:"اختيار ملف",
+  add:"إضافة صنف",template:"تحميل قالب الشيت",histHead:"سجل التحديثات (آخر 30)",restore:"استرجاع",current:"الحالي",
+  pinHead:"دخول المسؤول",pinDesc:"اكتب رمز المسؤول عشان تقدر ترفع شيت أو تعدّل الأصناف. المشاهدة متاحة للكل بدون رمز.",
+  cancel:"إلغاء",enter:"دخول",save:"حفظ ونشر",publish:"نشر التحديث",mDelete:"حذف الصنف",
+  lName:"اسم الدواء",lBal:"الرصيد الحالي (وحدة)",lRate:"المعدل الشهري للاستهلاك",
+  editHead:"تعديل بيانات الدواء",addHead:"إضافة دواء جديد",
+  prevHead:"مراجعة الشيت قبل النشر",noteLabel:"ملاحظة (اختياري)",
+  pItems:"صنف",pNew:"جديد",pGone:"اختفى",pChanged:"اتغير رصيده",
+  pNewList:"أصناف جديدة:",pGoneList:"أصناف مش موجودة في الشيت الجديد:",pBig:"أكبر تغييرات في الرصيد:",
+  wDup:function(n){return "تنبيه: "+n+" اسم مكرر، اتجمع رصيدهم.";},
+  wNoRate:function(n){return n+" صنف بدون معدل استهلاك.";},
+  badPin:"الرمز غلط",noStore:"التخزين المشترك مش متفعّل على السيرفر لسه.",
+  netErr:"فيه مشكلة في الاتصال. جرّب تاني.",
+  tSaved:"اتنشر التحديث للجميع ✓",tDeleted:"اتحذف الصنف",tCopied:"اتنسخت الطلبية",tExported:"اتحمل الملف",
+  tNoOrder:"كل الأصناف مغطية فترة الهدف",tBadFile:"مقدرتش أقرا الشيت. اتأكد من الأعمدة: اسم الدواء، الرصيد الحالي، المعدل الشهري.",
+  tAdminOff:"خرجت من وضع المسؤول",tRestored:"اترجعت النسخة دي ✓",confirmRestore:"ترجع النسخة دي وتنشرها للجميع؟",
+  confirmDelete:"متأكد إنك عايز تحذف الصنف ده؟",logoutQ:"تخرج من وضع المسؤول؟",
+  orderMsg:function(d,date){return "طلبية مضادات حيوية — تغطية "+d+" يوم ("+date+")";},
+  colName:"اسم الدواء",colBal:"الرصيد الحالي",colRate:"المعدل الشهري",colDays:"أيام التغطية",colStatus:"الحالة",colOrder:function(d){return "مقترح الطلب ("+d+" يوم)";}
+ },
+ en:{dir:"ltr",title:"Antibiotic Stock",refresh:"Refresh data",
+  st:{g:"Sufficient",y:"< 1 month",r:"< 1 week",x:"Out of stock"},
+  sortOpts:[["urgent","Most urgent first"],["safe","Sufficient first"],["alpha","Alphabetical (A–Z)"],["rate","Highest monthly usage"],["bal","Highest stock"],["delta","Biggest change since last sheet"]],
+  targetLbl:function(d){return "Order target: "+d+" days";},
+  chips:{all:"All","need-order":"Needs order","under-15":"Critical (< 15d)","in-stock":"In stock only",changed:"Changed since last sheet"},
+  search:"Search drug (e.g. Vanco, Mero)...",
+  outOfStock:"Out of stock",noRate:"No usage recorded",
+  daysLeft:function(d){return "~"+d+" days left";},
+  runsOut:function(s){return "runs out ~"+s;},
+  bal:"Stock:",rate:"Monthly:",
+  reorder:function(q){return "Order: +"+fmt(q);},
+  delta:function(v){return (v>0?"▲ +":"▼ ")+fmt(v)+" since last sheet";},
+  isNew:"New item",edit:"Edit",empty:"No drugs match the current filter or search.",
+  updated:"Updated:",offline:"Saved copy (offline)",demo:"Original sheet data",
+  showing:function(n,t){return "Showing "+n+" of "+t+" items";},
+  health:function(t,a){return "Total: <b>"+t+"</b> items • Available: <b>"+a+"</b>";},
+  reorderSum:function(c,u){return "Needs order: <b>"+c+"</b> items ("+fmt(u)+" units)";},
+  admin:"Admin login",adminOn:"Admin mode ✓",
+  ordHead:"Reorder list & exports",ordDesc:"Suggested quantity = expected usage over the target period minus current stock.",
+  copyOrder:"Copy order (WhatsApp)",expOrder:"Export order (.xlsx)",expAll:"Export full stock (.xlsx)",print:"Print",
+  upHead:"Upload a new sheet to update stock for everyone",
+  upDesc:"Columns: drug name, current stock, monthly rate. You'll review a summary of changes before publishing; after that everyone with the link sees the new stock.",
+  dropTitle:"Drop an Excel file here or click to choose",dropSub:".xlsx / .xls / .csv",chooseBtn:"Choose file",
+  add:"Add item",template:"Download sheet template",histHead:"Update history (last 30)",restore:"Restore",current:"Current",
+  pinHead:"Admin login",pinDesc:"Enter the admin code to upload sheets or edit items. Viewing is open to everyone.",
+  cancel:"Cancel",enter:"Enter",save:"Save & publish",publish:"Publish update",mDelete:"Delete item",
+  lName:"Drug name",lBal:"Current stock (units)",lRate:"Monthly consumption",
+  editHead:"Edit drug",addHead:"Add new drug",
+  prevHead:"Review sheet before publishing",noteLabel:"Note (optional)",
+  pItems:"items",pNew:"new",pGone:"removed",pChanged:"stock changed",
+  pNewList:"New items:",pGoneList:"Not in the new sheet:",pBig:"Biggest stock changes:",
+  wDup:function(n){return "Warning: "+n+" duplicate names, their stock was summed.";},
+  wNoRate:function(n){return n+" items have no usage rate.";},
+  badPin:"Wrong code",noStore:"Shared storage is not enabled on the server yet.",
+  netErr:"Connection problem. Please try again.",
+  tSaved:"Update published for everyone ✓",tDeleted:"Item deleted",tCopied:"Order copied",tExported:"File downloaded",
+  tNoOrder:"All items cover the target period",tBadFile:"Couldn't read the sheet. Check columns: drug name, current stock, monthly rate.",
+  tAdminOff:"Admin mode off",tRestored:"Version restored ✓",confirmRestore:"Restore this version and publish it to everyone?",
+  confirmDelete:"Delete this item?",logoutQ:"Leave admin mode?",
+  orderMsg:function(d,date){return "Antibiotic order — "+d+"-day cover ("+date+")";},
+  colName:"Drug name",colBal:"Current stock",colRate:"Monthly rate",colDays:"Days of cover",colStatus:"Status",colOrder:function(d){return "Suggested order ("+d+"d)";}
+ }
+};
+
+function fmt(n){ return Math.abs(Math.round(n)).toLocaleString("en-US"); }
+function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+function norm(s){ return String(s||"").toLowerCase().replace(/[ً-ٟ]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/\s+/g," ").trim(); }
+function rj(k){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch(e){ return null; } }
+function wj(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+function $(id){ return document.getElementById(id); }
+
+var prefs = rj(PREF_KEY) || {};
+var cached = rj(CACHE_KEY);
+var S = {
+  rows: cached && cached.current ? cached.current.rows : [],
+  updated: cached && cached.current ? cached.current.updated : null,
+  source: cached && cached.current ? cached.current.source : "",
+  previous: cached ? cached.previous : null,
+  history: cached ? cached.history || [] : [],
+  storage: cached ? cached.storage : true,
+  offline: !!cached, loaded: false,
+  statusFilter:"all", quick:"all", query:"",
+  sortBy: prefs.sortBy || "urgent", target: Number(prefs.target) || 30,
+  lang: prefs.lang === "en" ? "en" : "ar", theme: prefs.theme || "auto",
+  pin: null, editing: -1, pending: null
+};
+try { S.pin = sessionStorage.getItem(PIN_KEY); } catch(e){}
+
+function T(){ return I18N[S.lang]; }
+function savePrefs(){ wj(PREF_KEY,{sortBy:S.sortBy,target:S.target,lang:S.lang,theme:S.theme}); }
+
+var toastTimer;
+function toast(m){ var el=$("toast"); el.textContent=m; el.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(function(){el.classList.remove("show");},3200); }
+
+/* ---------- calculations ---------- */
+function status(bal,rate){
+  if(!(bal>0)) return {k:"x",days:0};
+  if(!(rate>0)) return {k:"g",days:null};
+  var d=bal/rate*30;
+  return {k:d<7?"r":(d<30?"y":"g"),days:d};
+}
+function reorderQty(bal,rate,days){
+  if(!(rate>0)) return 0;
+  var n=Math.ceil(rate*days/30-bal-1e-9);
+  return n>0?n:0;
+}
+function prevMap(){
+  var m={}; (S.previous||[]).forEach(function(r){ m[norm(r[0])]=Number(r[1])||0; }); return m;
+}
+function enrich(){
+  var pm = S.previous ? prevMap() : null;
+  return S.rows.map(function(r,i){
+    var bal=Number(r[1])||0, rate=Number(r[2])||0, key=norm(r[0]);
+    var delta=null, isNew=false;
+    if(pm){ if(key in pm) delta=bal-pm[key]; else isNew=true; }
+    return {idx:i,name:String(r[0]).trim(),bal:bal,rate:rate,st:status(bal,rate),order:reorderQty(bal,rate,S.target),delta:delta,isNew:isNew};
+  });
+}
+function dateLoc(d,opts){ return d.toLocaleDateString(S.lang==="ar"?"ar-EG":"en-GB",opts||{day:"numeric",month:"short"}); }
+
+/* ---------- static text ---------- */
+function applyTheme(){
+  var root=document.documentElement;
+  if(S.theme==="auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme",S.theme);
+  var dark=S.theme==="dark"||(S.theme==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches);
+  $("btn-theme").textContent=dark?"☀":"☾";
+}
+function applyLang(){
+  var t=T();
+  document.documentElement.lang=S.lang; document.documentElement.dir=t.dir;
+  document.title=t.title;
+  document.querySelectorAll("[data-t]").forEach(function(el){ var v=t[el.dataset.t]; if(typeof v==="string") el.textContent=v; });
+  $("btn-refresh").title=t.refresh; $("btn-refresh").setAttribute("aria-label",t.refresh);
+  $("btn-lang").textContent=S.lang==="ar"?"EN":"عربي";
+  $("q").placeholder=t.search; $("q").setAttribute("aria-label",t.search);
+  $("btn-copy-order").textContent=t.copyOrder; $("btn-export-order").textContent=t.expOrder;
+  $("btn-export-all").textContent=t.expAll; $("btn-print").textContent=t.print;
+  $("btn-add").textContent="+ "+t.add; $("btn-template").textContent=t.template;
+  $("sort-by").innerHTML=t.sortOpts.map(function(o){return '<option value="'+o[0]+'"'+(S.sortBy===o[0]?" selected":"")+">"+o[1]+"</option>";}).join("");
+  $("target-days").innerHTML=[14,30,45,60,90].map(function(d){return '<option value="'+d+'"'+(S.target===d?" selected":"")+">"+t.targetLbl(d)+"</option>";}).join("");
+  $("quick-chips").innerHTML=["all","need-order","under-15","in-stock","changed"].map(function(k){
+    return '<button type="button" class="chip" data-quick="'+k+'" aria-pressed="'+(S.quick===k)+'">'+t.chips[k]+"</button>";
+  }).join("");
+  applyAdmin();
+}
+function applyAdmin(){
+  var on=!!S.pin, t=T();
+  $("admin-label").textContent=on?t.adminOn:t.admin;
+  $("btn-admin").classList.toggle("admin-on",on);
+  $("admin-panel").classList.toggle("hidden",!on);
+}
+
+/* ---------- render ---------- */
+function render(){
+  var t=T(), items=enrich();
+  var cnt={g:0,y:0,r:0,x:0}, oc=0, ou=0;
+  items.forEach(function(it){ cnt[it.st.k]++; if(it.order>0){oc++;ou+=it.order;} });
+
+  var sub=[];
+  if(S.updated) sub.push(esc(t.updated+" "+new Date(S.updated).toLocaleString(S.lang==="ar"?"ar-EG":"en-GB",{dateStyle:"medium",timeStyle:"short"})));
+  if(S.source) sub.push('<span class="pill">'+esc(S.source)+"</span>");
+  if(S.offline&&!S.loaded) sub.push('<span class="pill warn">'+esc(t.offline)+"</span>");
+  $("sub").innerHTML=sub.join(" ");
+
+  var tot=items.length||1;
+  $("health-summary").innerHTML=t.health(items.length,cnt.g+cnt.y+cnt.r);
+  $("reorder-summary").innerHTML=t.reorderSum(oc,ou);
+  $("health-bar").innerHTML=["g","y","r","x"].map(function(k){return '<div class="seg-'+k+'" style="width:'+(cnt[k]/tot*100).toFixed(2)+'%"></div>';}).join("");
+  $("counts").innerHTML=["g","y","r","x"].map(function(k){
+    return '<button type="button" class="c-'+k+'" data-k="'+k+'" aria-pressed="'+(S.statusFilter===k)+'"><b>'+cnt[k]+"</b><span>"+t.st[k]+"</span></button>";
+  }).join("");
+  document.querySelectorAll("#quick-chips .chip").forEach(function(b){ b.setAttribute("aria-pressed",String(b.dataset.quick===S.quick)); });
+
+  var q=norm(S.query);
+  $("q-clear").classList.toggle("show",q.length>0);
+  var list=items.filter(function(it){
+    if(S.statusFilter!=="all"&&it.st.k!==S.statusFilter) return false;
+    if(S.quick==="need-order"&&it.order<=0) return false;
+    if(S.quick==="under-15"&&!(it.st.k==="x"||(it.st.days!==null&&it.st.days<15))) return false;
+    if(S.quick==="in-stock"&&it.st.k==="x") return false;
+    if(S.quick==="changed"&&!(it.isNew||(it.delta!==null&&it.delta!==0))) return false;
+    if(q&&norm(it.name+" "+t.st[it.st.k]).indexOf(q)===-1) return false;
+    return true;
+  });
+  var ur={x:0,r:1,y:2,g:3}, sr={g:0,y:1,r:2,x:3};
+  list.sort(function(a,b){
+    var byName=a.name.localeCompare(b.name);
+    switch(S.sortBy){
+      case "urgent": return (ur[a.st.k]-ur[b.st.k])||((a.st.days===null?1e9:a.st.days)-(b.st.days===null?1e9:b.st.days))||byName;
+      case "safe": return (sr[a.st.k]-sr[b.st.k])||byName;
+      case "rate": return (b.rate-a.rate)||byName;
+      case "bal": return (b.bal-a.bal)||byName;
+      case "delta": return (Math.abs(b.delta||0)-Math.abs(a.delta||0))||byName;
+      default: return byName;
+    }
+  });
+
+  $("results-count").innerHTML="<strong>"+esc(t.showing(list.length,items.length))+"</strong>";
+  var notes=[]; if(S.statusFilter!=="all") notes.push(t.st[S.statusFilter]); if(S.quick!=="all") notes.push(t.chips[S.quick]);
+  $("active-filter-note").textContent=notes.join(" • ");
+
+  if(!list.length){ $("list").innerHTML='<li class="empty">'+esc(S.loaded||S.rows.length?t.empty:"…")+"</li>"; return; }
+  var admin=!!S.pin, now=S.updated?new Date(S.updated).getTime():Date.now();
+  $("list").innerHTML=list.map(function(it){
+    var info=[];
+    if(it.st.k==="x") info.push(esc(t.outOfStock));
+    else if(it.st.days===null) info.push(esc(t.noRate));
+    else {
+      info.push(esc(t.daysLeft(Math.floor(it.st.days))));
+      if(it.st.days<120) info.push(esc(t.runsOut(dateLoc(new Date(now+it.st.days*864e5)))));
+    }
+    info.push(esc(t.bal)+' <span class="num">'+fmt(it.bal)+"</span>");
+    info.push(esc(t.rate)+' <span class="num">'+fmt(it.rate)+"</span>");
+    if(it.isNew) info.push('<span class="delta up">'+esc(t.isNew)+"</span>");
+    else if(it.delta) info.push('<span class="delta '+(it.delta<0?"down":"up")+'">'+esc(t.delta(it.delta))+"</span>");
+    var pct=it.st.k==="x"?0:(it.st.days===null?100:Math.min(100,Math.round(it.st.days/60*100)));
+    return '<li class="drug-card '+it.st.k+'"><div class="drug-main"><div class="drug-name">'+esc(it.name)+'</div>'+
+      '<div class="drug-days"><span>'+info.join("</span><span>")+"</span></div>"+
+      '<div class="cov-track" aria-hidden="true"><div class="cov-fill" style="width:'+pct+'%"></div></div></div>'+
+      '<div class="drug-side"><span class="status-pill">'+esc(t.st[it.st.k])+"</span>"+
+      (it.order>0?'<span class="reorder-pill">'+esc(t.reorder(it.order))+"</span>":"")+
+      (admin?'<button type="button" class="mini-btn" data-edit="'+it.idx+'">'+esc(t.edit)+"</button>":"")+
+      "</div></li>";
+  }).join("");
+}
+
+function renderHistory(){
+  var t=T();
+  if(!S.history.length){ $("hist").innerHTML='<li><span>'+esc(t.demo)+"</span></li>"; return; }
+  $("hist").innerHTML=S.history.map(function(h,i){
+    var d=new Date(h.at).toLocaleString(S.lang==="ar"?"ar-EG":"en-GB",{dateStyle:"medium",timeStyle:"short"});
+    return "<li><span>"+esc(d)+"</span>"+(i===0?'<span class="pill">'+esc(t.current)+"</span>":'<button type="button" class="mini-btn" data-restore="'+esc(h.id)+'">'+esc(t.restore)+"</button>")+"</li>";
+  }).join("");
+}
+
+/* ---------- server ---------- */
+function load(silent){
+  return fetch(API,{cache:"no-store"}).then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(d){
+    S.rows=d.current.rows; S.updated=d.current.updated; S.source=d.current.source||"";
+    S.previous=d.previous; S.history=d.history||[]; S.storage=d.storage!==false;
+    S.loaded=true; S.offline=false;
+    wj(CACHE_KEY,d); render(); renderHistory();
+  }).catch(function(){ S.offline=true; render(); if(!silent) toast(T().netErr); });
+}
+function publish(rows,source,note){
+  return fetch(API,{method:"POST",headers:{"Content-Type":"application/json","x-admin-pin":S.pin||""},body:JSON.stringify({rows:rows,source:source,note:note||""})})
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,status:r.status,j:j}; }); })
+  .then(function(res){
+    if(res.status===401){ logout(true); throw new Error(T().badPin); }
+    if(res.status===503) throw new Error(T().noStore);
+    if(!res.ok) throw new Error(T().netErr);
+    return load(true);
+  }, function(e){ throw (e instanceof Error && e.message) ? e : new Error(T().netErr); });
+}
+
+/* ---------- admin ---------- */
+function openModal(id){ $(id).classList.add("open"); }
+function closeModal(id){ $(id).classList.remove("open"); }
+document.querySelectorAll("[data-close]").forEach(function(b){ b.addEventListener("click",function(){ closeModal(b.dataset.close); }); });
+document.querySelectorAll(".modal-backdrop").forEach(function(m){ m.addEventListener("click",function(e){ if(e.target===m) closeModal(m.id); }); });
+document.addEventListener("keydown",function(e){ if(e.key==="Escape") document.querySelectorAll(".modal-backdrop.open").forEach(function(m){ closeModal(m.id); }); });
+
+function logout(quiet){ S.pin=null; try{sessionStorage.removeItem(PIN_KEY);}catch(e){} applyAdmin(); render(); if(!quiet) toast(T().tAdminOff); }
+$("btn-admin").addEventListener("click",function(){
+  if(S.pin){ if(confirm(T().logoutQ)) logout(); return; }
+  $("pin-input").value=""; $("pin-err").textContent=""; openModal("pin-modal"); setTimeout(function(){$("pin-input").focus();},50);
+});
+function tryPin(){
+  var p=$("pin-input").value.trim(); if(!p) return;
+  $("pin-ok").disabled=true;
+  fetch(API,{method:"POST",headers:{"Content-Type":"application/json","x-admin-pin":p},body:JSON.stringify({checkOnly:true})})
+  .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}); })
+  .then(function(res){
+    if(!res.ok){ $("pin-err").textContent=T().badPin; return; }
+    S.pin=p; try{sessionStorage.setItem(PIN_KEY,p);}catch(e){}
+    closeModal("pin-modal"); applyAdmin(); render(); renderHistory();
+    if(res.j.storage===false) toast(T().noStore);
+  }).catch(function(){ $("pin-err").textContent=T().netErr; })
+  .then(function(){ $("pin-ok").disabled=false; });
+}
+$("pin-ok").addEventListener("click",tryPin);
+$("pin-input").addEventListener("keydown",function(e){ if(e.key==="Enter") tryPin(); });
+
+/* edit / add */
+function openEdit(idx){
+  var t=T(); S.editing=idx; var isNew=idx<0;
+  $("edit-title").textContent=isNew?t.addHead:t.editHead;
+  $("m-delete").style.display=isNew?"none":"";
+  var r=isNew?["",0,0]:S.rows[idx];
+  $("m-name").value=r[0]; $("m-bal").value=r[1]; $("m-rate").value=r[2]; $("edit-err").textContent="";
+  openModal("edit-modal"); setTimeout(function(){$("m-name").focus();},50);
+}
+function commit(rows,btn,modal,msg){
+  btn.disabled=true;
+  publish(rows,"manual edit").then(function(){ closeModal(modal); toast(msg); })
+  .catch(function(e){ $("edit-err").textContent=e.message; })
+  .then(function(){ btn.disabled=false; });
+}
+$("m-save").addEventListener("click",function(){
+  var nm=$("m-name").value.trim(); if(!nm) return;
+  var row=[nm,Math.max(0,Number($("m-bal").value)||0),Math.max(0,Number($("m-rate").value)||0)];
+  var rows=S.rows.map(function(r){return r.slice();});
+  if(S.editing<0) rows.push(row); else rows[S.editing]=row;
+  commit(rows,$("m-save"),"edit-modal",T().tSaved);
+});
+$("m-delete").addEventListener("click",function(){
+  if(S.editing<0||!confirm(T().confirmDelete)) return;
+  var rows=S.rows.filter(function(_,i){return i!==S.editing;});
+  commit(rows,$("m-delete"),"edit-modal",T().tDeleted);
+});
+$("list").addEventListener("click",function(e){ var b=e.target.closest("[data-edit]"); if(b) openEdit(Number(b.dataset.edit)); });
+$("btn-add").addEventListener("click",function(){ openEdit(-1); });
+
+/* upload */
+function parseRows(raw){
+  if(!Array.isArray(raw)||!raw.length) return null;
+  var head=(raw[0]||[]).map(function(c){return norm(c);});
+  var ni=-1,bi=-1,ri=-1;
+  head.forEach(function(h,i){
+    if(ni<0&&/دوا|صنف|اسم|name|drug|item|product|antibiotic/.test(h)) ni=i;
+    else if(bi<0&&/رصيد|مخزون|stock|bal|qty|quantity|on hand/.test(h)) bi=i;
+    else if(ri<0&&/معدل|استهلاك|شهري|rate|month|usage|consum/.test(h)) ri=i;
+  });
+  var hasHeader=ni>=0||bi>=0||ri>=0;
+  if(ni<0) ni=0; if(bi<0) bi=1; if(ri<0) ri=2;
+  var num=function(v){ return Number(String(v==null?0:v).replace(/[,\s]/g,"").replace(/[٠-٩]/g,function(d){return "٠١٢٣٤٥٦٧٨٩".indexOf(d);}))||0; };
+  var map={}, order=[], dups=0;
+  for(var i=hasHeader?1:0;i<raw.length;i++){
+    var r=raw[i]; if(!r) continue;
+    var nm=String(r[ni]==null?"":r[ni]).trim(); if(!nm) continue;
+    var k=norm(nm), bal=Math.max(0,num(r[bi])), rate=Math.max(0,num(r[ri]));
+    if(map[k]){ dups++; map[k][1]+=bal; map[k][2]=Math.max(map[k][2],rate); }
+    else { map[k]=[nm,bal,rate]; order.push(k); }
+  }
+  var rows=order.map(function(k){return map[k];});
+  return rows.length?{rows:rows,dups:dups}:null;
+}
+function handleFile(file){
+  if(!file) return;
+  if(typeof XLSX==="undefined"){ toast(T().netErr); return; }
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var wb=XLSX.read(rd.result,{type:"array"});
+      var raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,blankrows:false});
+      var p=parseRows(raw); if(!p) throw 0;
+      S.pending={rows:p.rows,source:file.name};
+      showDiff(p);
+    }catch(e){ toast(T().tBadFile); }
+  };
+  rd.readAsArrayBuffer(file);
+}
+function showDiff(p){
+  var t=T(), old={}, neu={};
+  S.rows.forEach(function(r){ old[norm(r[0])]=r; });
+  p.rows.forEach(function(r){ neu[norm(r[0])]=r; });
+  var added=p.rows.filter(function(r){return !old[norm(r[0])];});
+  var gone=S.rows.filter(function(r){return !neu[norm(r[0])];});
+  var changed=p.rows.filter(function(r){var o=old[norm(r[0])];return o&&Number(o[1])!==Number(r[1]);})
+    .map(function(r){return {n:r[0],d:r[1]-old[norm(r[0])][1]};}).sort(function(a,b){return Math.abs(b.d)-Math.abs(a.d);});
+  var noRate=p.rows.filter(function(r){return !(r[2]>0);}).length;
+  var h='<div class="diff-stats"><div><b>'+p.rows.length+"</b>"+t.pItems+"</div><div><b>"+added.length+"</b>"+t.pNew+"</div><div><b>"+changed.length+"</b>"+t.pChanged+"</div></div>";
+  if(p.dups) h+='<div class="warn">'+esc(t.wDup(p.dups))+"</div>";
+  if(noRate) h+='<div class="warn">'+esc(t.wNoRate(noRate))+"</div>";
+  if(added.length) h+="<div><b>"+t.pNewList+"</b><ul>"+added.slice(0,12).map(function(r){return '<li dir="ltr">'+esc(r[0])+"</li>";}).join("")+"</ul></div>";
+  if(gone.length) h+="<div><b>"+t.pGoneList+" ("+gone.length+")</b><ul>"+gone.slice(0,12).map(function(r){return '<li dir="ltr">'+esc(r[0])+"</li>";}).join("")+"</ul></div>";
+  if(changed.length) h+="<div><b>"+t.pBig+"</b><ul>"+changed.slice(0,8).map(function(c){return '<li><span dir="ltr">'+esc(c.n)+"</span>: "+(c.d>0?"+":"−")+fmt(c.d)+"</li>";}).join("")+"</ul></div>";
+  $("diff").innerHTML=h; $("up-note").value=""; $("prev-err").textContent="";
+  openModal("preview-modal");
+}
+$("prev-ok").addEventListener("click",function(){
+  if(!S.pending) return; var b=$("prev-ok"); b.disabled=true;
+  publish(S.pending.rows,S.pending.source,$("up-note").value).then(function(){
+    closeModal("preview-modal"); S.pending=null; S.statusFilter="all"; S.quick="all"; render(); toast(T().tSaved);
+  }).catch(function(e){ $("prev-err").textContent=e.message; }).then(function(){ b.disabled=false; });
+});
+var dz=$("dropzone"), fi=$("file-input");
+dz.addEventListener("click",function(){ fi.click(); });
+dz.addEventListener("keydown",function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fi.click(); } });
+fi.addEventListener("change",function(e){ if(e.target.files[0]) handleFile(e.target.files[0]); e.target.value=""; });
+["dragenter","dragover"].forEach(function(ev){ dz.addEventListener(ev,function(e){ e.preventDefault(); dz.classList.add("drag"); }); });
+["dragleave","drop"].forEach(function(ev){ dz.addEventListener(ev,function(e){ e.preventDefault(); dz.classList.remove("drag"); }); });
+dz.addEventListener("drop",function(e){ if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+/* history restore */
+$("hist").addEventListener("click",function(e){
+  var b=e.target.closest("[data-restore]"); if(!b||!confirm(T().confirmRestore)) return;
+  b.disabled=true;
+  fetch(API+"?snap="+encodeURIComponent(b.dataset.restore),{cache:"no-store"}).then(function(r){return r.json();})
+  .then(function(d){ if(!d.snapshot) throw new Error(T().netErr); return publish(d.snapshot.rows,"restore: "+(d.snapshot.source||""),"restored"); })
+  .then(function(){ toast(T().tRestored); }).catch(function(e){ toast(e.message||T().netErr); b.disabled=false; });
+});
+
+/* ---------- exports ---------- */
+function orderItems(){ return enrich().filter(function(it){return it.order>0;}).sort(function(a,b){return (a.st.days||0)-(b.st.days||0)||a.name.localeCompare(b.name);}); }
+function download(aoa,sheet,file){
+  if(typeof XLSX==="undefined"){ toast(T().netErr); return; }
+  var ws=XLSX.utils.aoa_to_sheet(aoa); ws["!cols"]=aoa[0].map(function(_,i){return {wch:i===0?32:16};});
+  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,sheet); XLSX.writeFile(wb,file); toast(T().tExported);
+}
+var stamp=function(){ return new Date().toISOString().slice(0,10); };
+$("btn-export-order").addEventListener("click",function(){
+  var t=T(), it=orderItems(); if(!it.length){ toast(t.tNoOrder); return; }
+  var aoa=[[t.colName,t.colBal,t.colRate,t.colDays,t.colOrder(S.target)]];
+  it.forEach(function(x){ aoa.push([x.name,x.bal,x.rate,x.st.days===null?"":Math.floor(x.st.days),x.order]); });
+  download(aoa,"Order","antibiotic-order-"+S.target+"d-"+stamp()+".xlsx");
+});
+$("btn-export-all").addEventListener("click",function(){
+  var t=T(), aoa=[[t.colName,t.colBal,t.colRate,t.colDays,t.colStatus,t.colOrder(S.target)]];
+  enrich().forEach(function(x){ aoa.push([x.name,x.bal,x.rate,x.st.days===null?"":Math.floor(x.st.days),t.st[x.st.k],x.order]); });
+  download(aoa,"Stock","antibiotic-stock-"+stamp()+".xlsx");
+});
+$("btn-template").addEventListener("click",function(){
+  download([["اسم الدواء","الرصيد الحالي","المعدل الشهري"],["Meropenem 1g",4200,6000]],"Sheet1","antibiotic-template.xlsx");
+});
+$("btn-copy-order").addEventListener("click",function(){
+  var t=T(), it=orderItems(); if(!it.length){ toast(t.tNoOrder); return; }
+  var txt=t.orderMsg(S.target,dateLoc(new Date(),{day:"numeric",month:"short",year:"numeric"}))+"\n\n"+
+    it.map(function(x,i){ return (i+1)+". "+x.name+" — "+fmt(x.order)+(x.st.k==="x"?" ("+t.st.x+")":""); }).join("\n");
+  var done=function(){ toast(t.tCopied); };
+  if(navigator.share&&/Android|iPhone|iPad/i.test(navigator.userAgent)){ navigator.share({text:txt}).catch(function(){}); return; }
+  if(navigator.clipboard) navigator.clipboard.writeText(txt).then(done,function(){ prompt("",txt); });
+  else prompt("",txt);
+});
+$("btn-print").addEventListener("click",function(){ window.print(); });
+
+/* ---------- controls ---------- */
+$("counts").addEventListener("click",function(e){ var b=e.target.closest("[data-k]"); if(!b) return; S.statusFilter=S.statusFilter===b.dataset.k?"all":b.dataset.k; render(); });
+$("quick-chips").addEventListener("click",function(e){ var b=e.target.closest("[data-quick]"); if(!b) return; S.quick=b.dataset.quick; render(); });
+$("q").addEventListener("input",function(e){ S.query=e.target.value; render(); });
+$("q-clear").addEventListener("click",function(){ S.query=""; $("q").value=""; $("q").focus(); render(); });
+$("sort-by").addEventListener("change",function(e){ S.sortBy=e.target.value; savePrefs(); render(); });
+$("target-days").addEventListener("change",function(e){ S.target=Number(e.target.value)||30; savePrefs(); render(); });
+$("btn-theme").addEventListener("click",function(){
+  var dark=S.theme==="dark"||(S.theme==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches);
+  S.theme=dark?"light":"dark"; savePrefs(); applyTheme();
+});
+$("btn-lang").addEventListener("click",function(){ S.lang=S.lang==="ar"?"en":"ar"; savePrefs(); applyLang(); render(); renderHistory(); });
+$("btn-refresh").addEventListener("click",function(){ load(false); });
+document.addEventListener("visibilitychange",function(){ if(!document.hidden) load(true); });
+setInterval(function(){ if(!document.hidden) load(true); },120000);
+
+applyTheme(); applyLang(); render(); renderHistory(); load(true);
+if(S.pin) fetch(API,{method:"POST",headers:{"Content-Type":"application/json","x-admin-pin":S.pin},body:'{"checkOnly":true}'}).then(function(r){ if(r.status===401) logout(true); }).catch(function(){});
+if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function(){});
+})();
+</script>
+</body>
+</html>
